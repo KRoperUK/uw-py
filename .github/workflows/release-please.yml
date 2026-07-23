@@ -16,9 +16,37 @@ jobs:
     release-please:
         runs-on: ubuntu-latest
         timeout-minutes: 10
+        outputs:
+            release_created: ${{ steps.release.outputs.release_created }}
         steps:
             - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+              id: release
               with:
                   token: ${{ github.token }}
                   config-file: release-please-config.json
                   manifest-file: .release-please-manifest.json
+
+    publish:
+        needs: release-please
+        if: ${{ needs.release-please.outputs.release_created == 'true' }}
+        runs-on: ubuntu-latest
+        timeout-minutes: 10
+        environment: pypi
+        permissions:
+            contents: read
+            id-token: write
+        steps:
+            - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+            - name: Set up Python
+              uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+              with:
+                  python-version: "3.13"
+
+            - name: Build package
+              run: |
+                  pip install build
+                  python -m build
+
+            - name: Publish to PyPI
+              uses: pypa/gh-action-pypi-publish@bf33e6203f0c0d0e07ca59020d22a0783352e6a3 # v6.2.2
