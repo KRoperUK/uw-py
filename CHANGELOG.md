@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.1](https://github.com/KRoperUK/uw-py/compare/v0.2.0...v0.2.1) (2026-07-23)
+
+
+### Bug Fixes
+
+* lazy httpx.AsyncClient creation to avoid blocking SSL init ([ad96276](https://github.com/KRoperUK/uw-py/commit/ad962764820c7f37983ca0fb9f215e1742ae382a))
+* point pip cache at pyproject.toml, not ci.yml ([f94f388](https://github.com/KRoperUK/uw-py/commit/f94f38898ba96bc6ff2eb29f35fc30fc12e4320d))
+
 ## [0.2.0](https://github.com/KRoperUK/uw-py/compare/v0.1.0...v0.2.0) (2026-07-23)
 
 
