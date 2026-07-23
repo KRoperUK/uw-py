@@ -21,6 +21,7 @@ class UWClient:
         timeout: float = 30.0,
         max_retries: int = 3,
         backoff_base: float = 1.0,
+        http_client: httpx.AsyncClient | None = None,
     ) -> None:
         self._email = email
         self._password = password
@@ -28,31 +29,50 @@ class UWClient:
         self._max_retries = max_retries
         self._backoff_base = backoff_base
 
-        self._http_client = httpx.AsyncClient(
-            http2=False,
-            timeout=httpx.Timeout(timeout),
-            follow_redirects=True,
-        )
+        self._owns_client = http_client is None
+        self._http_client = http_client
 
-        self._auth = UWAuth(
+        self._auth_obj: UWAuth | None = None
+        self._gql_obj: UWGraphQL | None = None
+
+    def _ensure_client(self) -> None:
+        if self._auth_obj is not None:
+            return
+        if self._http_client is None:
+            self._http_client = httpx.AsyncClient(
+                http2=False,
+                timeout=httpx.Timeout(self._timeout),
+                follow_redirects=True,
+            )
+        self._auth_obj = UWAuth(
             self._http_client,
             email=self._email,
             password=self._password,
-            max_retries=max_retries,
-            backoff_base=backoff_base,
+            max_retries=self._max_retries,
+            backoff_base=self._backoff_base,
         )
-
-        self.gql = UWGraphQL(self, self._http_client)
+        self._gql_obj = UWGraphQL(self, self._http_client)
 
     @property
     def http_client(self) -> httpx.AsyncClient:
+        self._ensure_client()
+        assert self._http_client is not None
         return self._http_client
 
+    @property
+    def gql(self) -> UWGraphQL:
+        self._ensure_client()
+        assert self._gql_obj is not None
+        return self._gql_obj
+
     async def login(self) -> None:
-        await self._auth.login()
+        self._ensure_client()
+        assert self._auth_obj is not None
+        await self._auth_obj.login()
 
     async def close(self) -> None:
-        await self._http_client.aclose()
+        if self._owns_client and self._http_client is not None:
+            await self._http_client.aclose()
 
     async def __aenter__(self) -> UWClient:
         return self
@@ -66,7 +86,11 @@ class UWClient:
         query: str,
         variables: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        await self._auth.ensure_authenticated()
+        self._ensure_client()
+        assert self._auth_obj is not None
+        assert self._http_client is not None
+
+        await self._auth_obj.ensure_authenticated()
 
         body: dict[str, Any] = {
             "operationName": operation_name,
@@ -77,17 +101,17 @@ class UWClient:
         for attempt in range(self._max_retries):
             try:
                 response = await self._http_client.post(
-                    self._auth.graphql_url,
+                    self._auth_obj.graphql_url,
                     json=body,
                     headers={
                         "Content-Type": "application/json",
-                        "x-csrf-token": self._auth.csrf_token or "1",
+                        "x-csrf-token": self._auth_obj.csrf_token or "1",
                     },
                 )
 
                 if response.status_code == 401:
                     _LOGGER.warning("Session expired, re-authenticating")
-                    await self._auth.re_auth()
+                    await self._auth_obj.re_auth()
                     continue
 
                 if response.status_code == 429:
@@ -126,7 +150,7 @@ class UWClient:
             except httpx.HTTPStatusError as exc:
                 if exc.response.status_code == 401:
                     _LOGGER.warning("Session expired, re-authenticating")
-                    await self._auth.re_auth()
+                    await self._auth_obj.re_auth()
                     continue
                 if exc.response.status_code == 429:
                     retry_after = int(

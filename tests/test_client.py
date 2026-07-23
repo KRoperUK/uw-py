@@ -53,8 +53,10 @@ def graphql_bills() -> dict:
 
 
 def _mock_authenticated(client: UWClient) -> None:
-    client._auth._authenticated = True
-    client._auth._session_expires_at = time.monotonic() + 3600
+    client._ensure_client()
+    assert client._auth_obj is not None
+    client._auth_obj._authenticated = True
+    client._auth_obj._session_expires_at = time.monotonic() + 3600
 
 
 class TestGraphQL:
