@@ -6,7 +6,7 @@ import logging
 import re
 import secrets
 import time
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 import httpx
 
@@ -89,9 +89,16 @@ class UWAuth:
         return code_verifier, code_challenge
 
     async def _fetch_login_page(self) -> httpx.Response:
-        response = await self._client.get(self._login_page)
-        response.raise_for_status()
-        return response
+        url = "https://myaccount.uw.co.uk/"
+        for _ in range(5):
+            response = await self._client.get(url)
+            if response.status_code == 200:
+                return response
+            location = response.headers.get("Location", "")
+            if not location:
+                break
+            url = urljoin(str(response.url), location) if not location.startswith("http") else location
+        raise UWAuthError("Could not reach UW login page")
 
     async def login(self) -> None:
         code_verifier, code_challenge = self._generate_pkce()
@@ -151,7 +158,10 @@ class UWAuth:
                 page_text = response.text
                 error = self._extract_error(page_text)
                 if error:
-                    raise UWAuthError(error)
+                    raise UWAuthError(
+                        "Login rejected — Castle.io bot detection requires a real "
+                        "browser. See https://github.com/KRoperUK/uw-py#limitations"
+                    )
                 raise UWAuthError(f"Unexpected login response: {response.status_code}")
 
             except UWAuthError:
