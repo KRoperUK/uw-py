@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.2.2](https://github.com/KRoperUK/uw-py/compare/v0.2.1...v0.2.2) (2026-07-24)
+
+
+### Bug Fixes
+
+* add pdfplumber to dev extras, relax test assertion ([52ae2a9](https://github.com/KRoperUK/uw-py/commit/52ae2a9731907ecb1590bf16882786a5e04630c9))
+* move pdfplumber to optional dev dependency ([cd79959](https://github.com/KRoperUK/uw-py/commit/cd79959e1fe693424398993805ba58c0180499bf))
+* relax pydantic constraint to &gt;=2.0 ([1d4014c](https://github.com/KRoperUK/uw-py/commit/1d4014ce4f7c39ace650d05e07e831d0f0354233))
+
 ## [0.2.1](https://github.com/KRoperUK/uw-py/compare/v0.2.0...v0.2.1) (2026-07-23)
 
 

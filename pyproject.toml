@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "uw-api"
-version = "0.2.1"
+version = "0.2.2"
 description = "Async Python client for the Utility Warehouse customer portal API"
 readme = "README.md"
 license = { text = "MIT" }
