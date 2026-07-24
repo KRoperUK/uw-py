@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.3](https://github.com/KRoperUK/uw-py/compare/v0.2.2...v0.2.3) (2026-07-24)
+
+
+### Bug Fixes
+
+* follow OAuth redirect chain to reach login page ([37a81b5](https://github.com/KRoperUK/uw-py/commit/37a81b5619b7eb7b07505c677e80b4711256cf7b))
+
 ## [0.2.2](https://github.com/KRoperUK/uw-py/compare/v0.2.1...v0.2.2) (2026-07-24)
 
 
