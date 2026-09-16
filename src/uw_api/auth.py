@@ -97,7 +97,7 @@ class UWAuth:
             location = response.headers.get("Location", "")
             if not location:
                 break
-            url = urljoin(str(response.url), location) if not location.startswith("http") else location
+            url = location if location.startswith("http") else urljoin(str(response.url), location)
         raise UWAuthError("Could not reach UW login page")
 
     async def login(self) -> None:
