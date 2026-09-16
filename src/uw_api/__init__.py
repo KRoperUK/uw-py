@@ -10,7 +10,7 @@ from uw_api.exceptions import (
     UWSessionExpiredError,
 )
 
-__version__ = "0.2.2"
+__version__ = "0.2.3"
 __all__ = [
     "UWApiError",
     "UWAuthError",
