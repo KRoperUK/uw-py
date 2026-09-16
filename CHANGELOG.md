@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.3](https://github.com/KRoperUK/uw-py/compare/v0.2.2...v0.2.3) (2026-09-16)
+
+
+### Bug Fixes
+
+* follow OAuth redirect chain to reach login page ([37a81b5](https://github.com/KRoperUK/uw-py/commit/37a81b5619b7eb7b07505c677e80b4711256cf7b))
+* wrap the redirect URL line to satisfy the 100-column limit ([#13](https://github.com/KRoperUK/uw-py/issues/13)) ([5a4a739](https://github.com/KRoperUK/uw-py/commit/5a4a7393ac919f6c1054bfc57005fdf97873c5ab))
+
 ## [0.2.2](https://github.com/KRoperUK/uw-py/compare/v0.2.1...v0.2.2) (2026-07-24)
 
 
