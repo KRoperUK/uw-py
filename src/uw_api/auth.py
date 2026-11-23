@@ -6,11 +6,12 @@ import logging
 import re
 import secrets
 import time
+from collections.abc import Mapping
 from urllib.parse import urljoin, urlparse
 
 import httpx
 
-from uw_api.exceptions import UWAuthError
+from uw_api.exceptions import UWAuthError, UWSessionExpiredError
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -18,6 +19,9 @@ _LOGIN_BASE = "https://account.uw.co.uk"
 _LOGIN_PAGE = f"{_LOGIN_BASE}/v2/login"
 _GRAPHQL_URL = "https://myaccount.uw.co.uk/server/graphql"
 _REDIRECT_HOST = "myaccount.uw.co.uk"
+_CSRF_COOKIE = "_csrf"
+_SESSION_COOKIES = ("uw-user-session", "uw-access-token")
+_COOKIE_DOMAIN = ".uw.co.uk"
 
 
 def _b64url(data: bytes) -> str:
@@ -36,6 +40,7 @@ class UWAuth:
         graphql_url: str = _GRAPHQL_URL,
         max_retries: int = 3,
         backoff_base: float = 1.0,
+        session_cookies: Mapping[str, str] | None = None,
     ) -> None:
         self._client = client
         self._email = email
@@ -47,14 +52,31 @@ class UWAuth:
 
         self._session_expires_at: float = 0.0
         self._authenticated = False
+        self._session_mode = session_cookies is not None
+        if session_cookies is not None:
+            self._load_session(session_cookies)
+
+    def _load_session(self, cookies: Mapping[str, str]) -> None:
+        if not cookies.get(_CSRF_COOKIE):
+            raise UWAuthError("Session cookies must include the _csrf cookie")
+        if not any(cookies.get(name) for name in _SESSION_COOKIES):
+            raise UWAuthError("Session cookies must include one of: " + ", ".join(_SESSION_COOKIES))
+        for name, value in cookies.items():
+            self._client.cookies.set(name, value, domain=_COOKIE_DOMAIN)
+        self._authenticated = True
+        self._session_expires_at = float("inf")
 
     @property
     def is_authenticated(self) -> bool:
         return self._authenticated and time.monotonic() < self._session_expires_at
 
     @property
+    def can_reauthenticate(self) -> bool:
+        return not self._session_mode
+
+    @property
     def csrf_token(self) -> str | None:
-        return None
+        return self._client.cookies.get(_CSRF_COOKIE)
 
     @property
     def graphql_url(self) -> str:
@@ -101,6 +123,11 @@ class UWAuth:
         raise UWAuthError("Could not reach UW login page")
 
     async def login(self) -> None:
+        if self._session_mode:
+            raise UWAuthError(
+                "Password login is not available to a session-cookie client; "
+                "import fresh cookies instead"
+            )
         code_verifier, code_challenge = self._generate_pkce()
 
         for attempt in range(self._max_retries):
@@ -147,21 +174,23 @@ class UWAuth:
 
                 if response.is_redirect or response.status_code in (302, 303):
                     await self._follow_redirects(response, code_verifier, code_challenge)
-                    self._authenticated = True
-                    self._session_expires_at = time.monotonic() + 3600
+                    self._mark_authenticated()
                     return
 
                 if response.status_code >= 500:
                     await asyncio.sleep(self._backoff_base * (2**attempt))
                     continue
 
-                page_text = response.text
-                error = self._extract_error(page_text)
+                # An auto-following client (UWClient's own default) has already
+                # walked the OAuth redirect chain. A 200 that no longer shows the
+                # login form is a completed login; one that does is a rejection.
+                if response.status_code == 200 and "login-form" not in response.text:
+                    self._mark_authenticated()
+                    return
+
+                error = self._extract_error(response.text)
                 if error:
-                    raise UWAuthError(
-                        "Login rejected — Castle.io bot detection requires a real "
-                        "browser. See https://github.com/KRoperUK/uw-py#limitations"
-                    )
+                    raise UWAuthError(error)
                 raise UWAuthError(f"Unexpected login response: {response.status_code}")
 
             except UWAuthError:
@@ -205,6 +234,14 @@ class UWAuth:
         if redirect_response.is_redirect or redirect_response.status_code in (302, 303):
             await self._follow_redirects(redirect_response, code_verifier, code_challenge)
 
+    def _mark_authenticated(self) -> None:
+        if not any(self._client.cookies.get(name) for name in _SESSION_COOKIES):
+            raise UWAuthError(
+                "Login did not complete — the UW portal did not issue a session cookie"
+            )
+        self._authenticated = True
+        self._session_expires_at = time.monotonic() + 3600
+
     def _extract_error(self, text: str) -> str | None:
         patterns = [
             r'class="[^"]*error[^"]*"[^>]*>([^<]+)<',
@@ -218,9 +255,14 @@ class UWAuth:
         return None
 
     async def ensure_authenticated(self) -> None:
-        if not self.is_authenticated:
-            await self.login()
+        if self.is_authenticated:
+            return
+        if self._session_mode:
+            raise UWSessionExpiredError("UW session cookies have expired; import fresh ones")
+        await self.login()
 
     async def re_auth(self) -> None:
+        if self._session_mode:
+            raise UWSessionExpiredError("UW session cookies have expired; import fresh ones")
         self._authenticated = False
         await self.login()

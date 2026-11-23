@@ -2,38 +2,73 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Mapping
 from typing import Any
 
 import httpx
 
 from uw_api.auth import UWAuth
-from uw_api.exceptions import UWApiError, UWRateLimitError
+from uw_api.exceptions import UWApiError, UWRateLimitError, UWSessionExpiredError
 from uw_api.graphql import UWGraphQL
 
 _LOGGER = logging.getLogger(__name__)
 
 
+def parse_cookie_string(raw: str) -> dict[str, str]:
+    """Split a browser `Cookie:` header into name/value pairs."""
+    cookies: dict[str, str] = {}
+    for part in raw.split(";"):
+        name, separator, value = part.strip().partition("=")
+        if name and separator:
+            cookies[name.strip()] = value.strip()
+    return cookies
+
+
 class UWClient:
     def __init__(
         self,
-        email: str,
-        password: str,
+        email: str | None = None,
+        password: str | None = None,
         timeout: float = 30.0,
         max_retries: int = 3,
         backoff_base: float = 1.0,
         http_client: httpx.AsyncClient | None = None,
+        session_cookies: Mapping[str, str] | None = None,
     ) -> None:
-        self._email = email
-        self._password = password
+        if session_cookies is None and (email is None or password is None):
+            raise ValueError("Provide either email/password or session_cookies")
+
+        self._email = email or ""
+        self._password = password or ""
         self._timeout = timeout
         self._max_retries = max_retries
         self._backoff_base = backoff_base
+        self._session_cookies = session_cookies
 
         self._owns_client = http_client is None
         self._http_client = http_client
 
         self._auth_obj: UWAuth | None = None
         self._gql_obj: UWGraphQL | None = None
+
+    @classmethod
+    def from_session(
+        cls,
+        cookie_string: str,
+        *,
+        timeout: float = 30.0,
+        max_retries: int = 3,
+        backoff_base: float = 1.0,
+        http_client: httpx.AsyncClient | None = None,
+    ) -> UWClient:
+        """Build a client from a browser `Cookie:` header instead of a password."""
+        return cls(
+            timeout=timeout,
+            max_retries=max_retries,
+            backoff_base=backoff_base,
+            http_client=http_client,
+            session_cookies=parse_cookie_string(cookie_string),
+        )
 
     def _ensure_client(self) -> None:
         if self._auth_obj is not None:
@@ -50,6 +85,7 @@ class UWClient:
             password=self._password,
             max_retries=self._max_retries,
             backoff_base=self._backoff_base,
+            session_cookies=self._session_cookies,
         )
         self._gql_obj = UWGraphQL(self, self._http_client)
 
@@ -69,6 +105,13 @@ class UWClient:
         self._ensure_client()
         assert self._auth_obj is not None
         await self._auth_obj.login()
+
+    async def _handle_unauthorized(self) -> None:
+        assert self._auth_obj is not None
+        if not self._auth_obj.can_reauthenticate:
+            raise UWSessionExpiredError("UW session has expired; import fresh browser cookies")
+        _LOGGER.warning("Session expired, re-authenticating")
+        await self._auth_obj.re_auth()
 
     async def close(self) -> None:
         if self._owns_client and self._http_client is not None:
@@ -110,8 +153,7 @@ class UWClient:
                 )
 
                 if response.status_code == 401:
-                    _LOGGER.warning("Session expired, re-authenticating")
-                    await self._auth_obj.re_auth()
+                    await self._handle_unauthorized()
                     continue
 
                 if response.status_code == 429:
@@ -149,8 +191,7 @@ class UWClient:
                 raise
             except httpx.HTTPStatusError as exc:
                 if exc.response.status_code == 401:
-                    _LOGGER.warning("Session expired, re-authenticating")
-                    await self._auth_obj.re_auth()
+                    await self._handle_unauthorized()
                     continue
                 if exc.response.status_code == 429:
                     retry_after = int(

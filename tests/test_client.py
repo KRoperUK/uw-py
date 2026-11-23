@@ -74,6 +74,25 @@ class TestGraphQL:
             assert account.account_id == "acc-uuid-123"
             assert account.account_number == "12345678"
 
+    async def test_graphql_sends_csrf_cookie(self, httpx_mock, graphql_account: dict) -> None:
+        httpx_mock.add_response(
+            method="POST",
+            url="https://myaccount.uw.co.uk/server/graphql",
+            json=graphql_account,
+            status_code=200,
+        )
+
+        async with UWClient(email="test@example.com", password="secret") as client:
+            _mock_authenticated(client)
+            assert client._auth_obj is not None
+            client._auth_obj._client.cookies.set(
+                "_csrf", "csrf-cookie-value", domain="myaccount.uw.co.uk"
+            )
+            await client.gql.get_account()
+
+            request = httpx_mock.get_requests()[0]
+            assert request.headers["x-csrf-token"] == "csrf-cookie-value"
+
     async def test_get_bills(self, httpx_mock, graphql_bills: dict) -> None:
         httpx_mock.add_response(
             method="POST",
