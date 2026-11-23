@@ -19,6 +19,7 @@ _LOGIN_PAGE = f"{_LOGIN_BASE}/v2/login"
 _GRAPHQL_URL = "https://myaccount.uw.co.uk/server/graphql"
 _REDIRECT_HOST = "myaccount.uw.co.uk"
 _CSRF_COOKIE = "_csrf"
+_SESSION_COOKIE = "uw-access-token"
 
 
 def _b64url(data: bytes) -> str:
@@ -148,21 +149,23 @@ class UWAuth:
 
                 if response.is_redirect or response.status_code in (302, 303):
                     await self._follow_redirects(response, code_verifier, code_challenge)
-                    self._authenticated = True
-                    self._session_expires_at = time.monotonic() + 3600
+                    self._mark_authenticated()
                     return
 
                 if response.status_code >= 500:
                     await asyncio.sleep(self._backoff_base * (2**attempt))
                     continue
 
-                page_text = response.text
-                error = self._extract_error(page_text)
+                # An auto-following client (UWClient's own default) has already
+                # walked the OAuth redirect chain. A 200 that no longer shows the
+                # login form is a completed login; one that does is a rejection.
+                if response.status_code == 200 and "login-form" not in response.text:
+                    self._mark_authenticated()
+                    return
+
+                error = self._extract_error(response.text)
                 if error:
-                    raise UWAuthError(
-                        "Login rejected — Castle.io bot detection requires a real "
-                        "browser. See https://github.com/KRoperUK/uw-py#limitations"
-                    )
+                    raise UWAuthError(error)
                 raise UWAuthError(f"Unexpected login response: {response.status_code}")
 
             except UWAuthError:
@@ -205,6 +208,14 @@ class UWAuth:
 
         if redirect_response.is_redirect or redirect_response.status_code in (302, 303):
             await self._follow_redirects(redirect_response, code_verifier, code_challenge)
+
+    def _mark_authenticated(self) -> None:
+        if not self._client.cookies.get(_SESSION_COOKIE):
+            raise UWAuthError(
+                "Login did not complete — the UW portal did not issue a session cookie"
+            )
+        self._authenticated = True
+        self._session_expires_at = time.monotonic() + 3600
 
     def _extract_error(self, text: str) -> str | None:
         patterns = [
