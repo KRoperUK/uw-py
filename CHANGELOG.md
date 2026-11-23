@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.3.0](https://github.com/KRoperUK/uw-py/compare/v0.2.2...v0.3.0) (2026-11-23)
+
+
+### Features
+
+* support authentication with imported session cookies ([a00e9a1](https://github.com/KRoperUK/uw-py/commit/a00e9a1760487eb0ae2365d8618e9fd0d7ebb529))
+* support authentication with imported session cookies ([71c5034](https://github.com/KRoperUK/uw-py/commit/71c5034aded9765f9102e537ec9a4b4788c99481))
+
+
+### Bug Fixes
+
+* follow OAuth redirect chain to reach login page ([37a81b5](https://github.com/KRoperUK/uw-py/commit/37a81b5619b7eb7b07505c677e80b4711256cf7b))
+* recognise a completed login and surface portal auth errors ([274c8c1](https://github.com/KRoperUK/uw-py/commit/274c8c1a9977ff2efb3545892d80315a51365011))
+* recognise a completed login and surface portal auth errors ([07f29ba](https://github.com/KRoperUK/uw-py/commit/07f29ba12153af133215a78ede071887e760fa71))
+* send the portal's _csrf cookie as the GraphQL CSRF token ([a8b220f](https://github.com/KRoperUK/uw-py/commit/a8b220fe0cef385695771ebb432ace27b51cc43e))
+* send the portal's _csrf cookie as the GraphQL CSRF token ([12d1af0](https://github.com/KRoperUK/uw-py/commit/12d1af0f5d5d9a1d571a17d2dc5bb8646bb27f2e))
+* sum register readings when the portal returns a list ([df22096](https://github.com/KRoperUK/uw-py/commit/df22096c729da8dfe20436423723132da19d0fcd))
+* wrap the redirect URL line to satisfy the 100-column limit ([#13](https://github.com/KRoperUK/uw-py/issues/13)) ([5a4a739](https://github.com/KRoperUK/uw-py/commit/5a4a7393ac919f6c1054bfc57005fdf97873c5ab))
+
 ## [0.2.2](https://github.com/KRoperUK/uw-py/compare/v0.2.1...v0.2.2) (2026-07-24)
 
 
