@@ -23,6 +23,22 @@ if TYPE_CHECKING:
     from uw_api.client import UWClient
 
 
+def register_value(register_reading: object) -> float | None:
+    """Total kWh across a read's register readings.
+
+    The portal returns one entry per register (e.g. Day and Night on an
+    Economy 7 meter), so a read can carry several values.
+    """
+    if isinstance(register_reading, dict):
+        entries: list[dict[str, Any]] = [register_reading]
+    elif isinstance(register_reading, list):
+        entries = [entry for entry in register_reading if isinstance(entry, dict)]
+    else:
+        return None
+    values = [float(entry["value"]) for entry in entries if entry.get("value") is not None]
+    return sum(values) if values else None
+
+
 class UWGraphQL:
     def __init__(self, client: UWClient, http_client: httpx.AsyncClient) -> None:
         self._client = client
@@ -56,24 +72,23 @@ class UWGraphQL:
             total_kwh: float = 0.0
 
             if latest:
-                rr = latest.get("registerReading", {})
-                if rr:
+                value = register_value(latest.get("registerReading"))
+                if value is not None:
                     read_date = latest.get("readDate", "")
                     dt = (
                         datetime.fromisoformat(read_date.replace("Z", "+00:00"))
                         if read_date
                         else datetime.now(tz=UTC)
                     )
-                    val = float(rr.get("value", 0))
                     readings.append(
                         UsageReading(
                             date=dt,
-                            value=val,
+                            value=value,
                             unit="kWh",
                             reading_type=("estimated" if latest.get("isEstimated") else "actual"),
                         )
                     )
-                    total_kwh = val
+                    total_kwh = value
 
             results.append(
                 EnergyUsage(
@@ -95,10 +110,9 @@ class UWGraphQL:
 
         for svc in services:
             fuel = svc.get("fuelType", "").upper()
-            meter = svc.get("meterpoint", {}).get("installedMeter", {})
-            latest = meter.get("reads", {}).get("latestRead", {})
-            rr = latest.get("registerReading", {})
-            val = float(rr.get("value", 0)) if rr.get("value") else 0.0
+            meter = svc.get("meterpoint", {}).get("installedMeter", {}) or {}
+            latest = meter.get("reads", {}).get("latestRead") or {}
+            val = register_value(latest.get("registerReading")) or 0.0
 
             if fuel == "ELECTRICITY":
                 elec_kwh = val
@@ -122,7 +136,7 @@ class UWGraphQL:
 
             meter_type = MeterType.ELECTRICITY if fuel == "ELECTRICITY" else MeterType.GAS
 
-            latest = meter.get("reads", {}).get("latestRead", {})
+            latest = meter.get("reads", {}).get("latestRead") or {}
             read_date_str = latest.get("readDate")
             read_date = None
             if read_date_str:
@@ -151,8 +165,8 @@ class UWGraphQL:
             for read in [latest, actual_read]:
                 if not read or not read.get("id"):
                     continue
-                rr = read.get("registerReading", {})
-                if not rr.get("value"):
+                value = register_value(read.get("registerReading"))
+                if value is None:
                     continue
                 read_date_str = read.get("readDate", "")
                 read_date = (
@@ -166,7 +180,7 @@ class UWGraphQL:
                         reading_id=read.get("id"),
                         meter_id=meter.get("id", ""),
                         reading_date=read_date,
-                        value=float(rr.get("value", 0)),
+                        value=value,
                         unit="kWh",
                         reading_type=("estimated" if read.get("isEstimated") else "actual"),
                         source=read.get("source", "customer"),
