@@ -18,6 +18,7 @@ _LOGIN_BASE = "https://account.uw.co.uk"
 _LOGIN_PAGE = f"{_LOGIN_BASE}/v2/login"
 _GRAPHQL_URL = "https://myaccount.uw.co.uk/server/graphql"
 _REDIRECT_HOST = "myaccount.uw.co.uk"
+_CSRF_COOKIE = "_csrf"
 
 
 def _b64url(data: bytes) -> str:
@@ -54,7 +55,7 @@ class UWAuth:
 
     @property
     def csrf_token(self) -> str | None:
-        return None
+        return self._client.cookies.get(_CSRF_COOKIE)
 
     @property
     def graphql_url(self) -> str:
