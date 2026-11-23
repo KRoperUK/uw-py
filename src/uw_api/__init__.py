@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from uw_api.client import UWClient
+from uw_api.client import UWClient, parse_cookie_string
 from uw_api.exceptions import (
     UWApiError,
     UWAuthError,
@@ -20,4 +20,5 @@ __all__ = [
     "UWRateLimitError",
     "UWSessionExpiredError",
     "__version__",
+    "parse_cookie_string",
 ]
