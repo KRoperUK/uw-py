@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.1](https://github.com/KRoperUK/uw-py/compare/v0.3.0...v0.3.1) (2026-11-23)
+
+
+### Bug Fixes
+
+* relax the pydantic floor to 2.0 ([5a4cb85](https://github.com/KRoperUK/uw-py/commit/5a4cb85469268561396ffb9e8e714f01f0e5d4a5))
+* relax the pydantic floor to 2.0 ([3218496](https://github.com/KRoperUK/uw-py/commit/32184968d5331680193df548d0e08bf20aec57f0))
+
 ## [0.3.0](https://github.com/KRoperUK/uw-py/compare/v0.2.2...v0.3.0) (2026-11-23)
 
 
