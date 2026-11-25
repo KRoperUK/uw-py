@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.0](https://github.com/KRoperUK/uw-py/compare/v0.3.1...v0.4.0) (2026-11-25)
+
+
+### Features
+
+* configurable Castle device id for login token ([b6d0061](https://github.com/KRoperUK/uw-py/commit/b6d00618b9c90650d58211f925b5576695921092))
+* configurable Castle device id for login token ([42949dd](https://github.com/KRoperUK/uw-py/commit/42949ddaf0f512677ba315b8515bd0b6560c435e))
+
 ## [0.3.1](https://github.com/KRoperUK/uw-py/compare/v0.3.0...v0.3.1) (2026-11-23)
 
 
