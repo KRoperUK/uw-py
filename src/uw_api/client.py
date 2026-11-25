@@ -34,6 +34,7 @@ class UWClient:
         backoff_base: float = 1.0,
         http_client: httpx.AsyncClient | None = None,
         session_cookies: Mapping[str, str] | None = None,
+        device_id: str | None = None,
     ) -> None:
         if session_cookies is None and (email is None or password is None):
             raise ValueError("Provide either email/password or session_cookies")
@@ -44,6 +45,7 @@ class UWClient:
         self._max_retries = max_retries
         self._backoff_base = backoff_base
         self._session_cookies = session_cookies
+        self._device_id = device_id
 
         self._owns_client = http_client is None
         self._http_client = http_client
@@ -86,6 +88,7 @@ class UWClient:
             max_retries=self._max_retries,
             backoff_base=self._backoff_base,
             session_cookies=self._session_cookies,
+            device_id=self._device_id,
         )
         self._gql_obj = UWGraphQL(self, self._http_client)
 
