@@ -64,6 +64,32 @@ def _auth(client: httpx.AsyncClient) -> UWAuth:
     return UWAuth(client, email="user@example.com", password="secret")
 
 
+def _token_payload(token: str) -> dict:
+    import base64
+    import json
+
+    segment = token.split(".")[1]
+    return json.loads(base64.urlsafe_b64decode(segment + "=" * (-len(segment) % 4)))
+
+
+class TestCastleDeviceId:
+    async def test_default_token_uses_legacy_device_id(self) -> None:
+        async with httpx.AsyncClient() as http:
+            token = _auth(http)._generate_castle_token()
+        assert _token_payload(token)["id"] == "1ecfa352-d2ed-44fc-8ca3-039196b57897"
+
+    async def test_custom_device_id_is_embedded(self) -> None:
+        async with httpx.AsyncClient() as http:
+            auth = UWAuth(
+                http,
+                email="user@example.com",
+                password="secret",
+                device_id="d6e1b0a1-0000-4000-8000-000000000001",
+            )
+            token = auth._generate_castle_token()
+        assert _token_payload(token)["id"] == "d6e1b0a1-0000-4000-8000-000000000001"
+
+
 class TestLogin:
     async def test_success_when_client_follows_redirects(self, httpx_mock) -> None:
         _register_login_page(httpx_mock, login_html=_login_html())

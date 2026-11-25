@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import json
 import logging
 import re
 import secrets
@@ -22,6 +23,9 @@ _REDIRECT_HOST = "myaccount.uw.co.uk"
 _CSRF_COOKIE = "_csrf"
 _SESSION_COOKIES = ("uw-user-session", "uw-access-token")
 _COOKIE_DOMAIN = ".uw.co.uk"
+# Device id baked into every Castle anti-bot token. Shared by all installs:
+# one block of this id breaks every user, so callers should pass their own.
+_LEGACY_CASTLE_DEVICE_ID = "1ecfa352-d2ed-44fc-8ca3-039196b57897"
 
 
 def _b64url(data: bytes) -> str:
@@ -41,6 +45,7 @@ class UWAuth:
         max_retries: int = 3,
         backoff_base: float = 1.0,
         session_cookies: Mapping[str, str] | None = None,
+        device_id: str | None = None,
     ) -> None:
         self._client = client
         self._email = email
@@ -49,6 +54,9 @@ class UWAuth:
         self._graphql_url = graphql_url
         self._max_retries = max_retries
         self._backoff_base = backoff_base
+        # Per-install device id for the Castle token. Defaults to the legacy
+        # shared id for backward compatibility; callers should persist their own.
+        self._device_id = device_id or _LEGACY_CASTLE_DEVICE_ID
 
         self._session_expires_at: float = 0.0
         self._authenticated = False
@@ -99,11 +107,14 @@ class UWAuth:
         return match.group(1) if match else None
 
     def _generate_castle_token(self) -> str:
-        return (
-            "eyJhbGciOiJFUzI1NiJ9.eyJpZCI6IjFlY2ZhMzUyLWQyZWQtNDRm"
-            "Yy04Y2EzLTAzOTE5NmI1Nzg5NyIsInR5cGUiOiJkZXZpY2UiLCJ2ZXJ"
-            "zaW9uIjoiMi4zLjAiLCJ0aW1lc3RhbXAiOjE3NTMzMDc3Nzl9." + secrets.token_hex(64)
-        )
+        payload = {
+            "id": self._device_id,
+            "type": "device",
+            "version": "2.3.0",
+            "timestamp": 1753307779,
+        }
+        encoded = _b64url(json.dumps(payload, separators=(",", ":")).encode())
+        return f"eyJhbGciOiJFUzI1NiJ9.{encoded}." + secrets.token_hex(64)
 
     def _generate_pkce(self) -> tuple[str, str]:
         code_verifier = secrets.token_urlsafe(64)
